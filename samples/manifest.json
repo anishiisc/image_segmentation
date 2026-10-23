@@ -1,0 +1,32 @@
+[
+  {
+    "name": "synth_bimodal.png",
+    "label": "Synthetic Bimodal",
+    "description": "Bright blobs on dark background — designed for perfect bimodality"
+  },
+  {
+    "name": "horse.png",
+    "label": "Binary Silhouette",
+    "description": "Pure black-and-white image — maximum bimodality, the ideal binary case"
+  },
+  {
+    "name": "coins.png",
+    "label": "Coins",
+    "description": "Bright coins on a dark background — strong real-world bimodal"
+  },
+  {
+    "name": "camera.png",
+    "label": "Cameraman",
+    "description": "Classic CV benchmark image — moderate, weakly bimodal histogram"
+  },
+  {
+    "name": "moon.png",
+    "label": "Moon Surface",
+    "description": "Low-contrast lunar image — near-unimodal, tests algorithm limits"
+  },
+  {
+    "name": "synth_unimodal.png",
+    "label": "Pure Unimodal",
+    "description": "Gaussian noise — single peak, truly unimodal histogram"
+  }
+]

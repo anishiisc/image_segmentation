@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bimodal CV Demo</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Header -->
+  <header>
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="28" height="28" rx="6" fill="white" fill-opacity=".15"/>
+      <path d="M4 22 Q8 8 12 14 Q16 20 20 10 Q22 5 24 6" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+    </svg>
+    <h1>Bimodal Histogram Segmentation &amp; Sharpening</h1>
+    <p>Dr. Anish Roychowdhury &middot; Generative AI Architect &amp; Educator</p>
+  </header>
+
+  <!-- Left panel -->
+  <aside class="sidebar">
+
+    <!-- Sample picker -->
+    <div>
+      <h2>Tutorial Images</h2>
+      <p class="hint" style="margin-bottom:10px">Click any image to run the full pipeline instantly.</p>
+      <div id="sample-grid"></div>
+    </div>
+
+    <!-- Histogram controls -->
+    <div>
+      <h2>Histogram Detection</h2>
+      <div class="control-group">
+        <div class="control">
+          <label>
+            Smoothing &sigma;
+            <span class="hint-icon" data-tip="Gaussian blur applied to the raw histogram before peak-finding. Higher = smoother curve, fewer false peaks. Lower = more sensitive, may detect noise as peaks.">?</span>
+            <span class="val-badge" id="sigma-val">3.0</span>
+          </label>
+          <input type="range" id="sigma" min="0" max="10" step="0.5" value="3">
+          <p class="hint">Higher &rarr; smoother, fewer peaks &nbsp;&middot;&nbsp; Lower &rarr; more peaks detected</p>
+        </div>
+        <div class="control">
+          <label>
+            Min peak prominence
+            <span class="hint-icon" data-tip="A peak must rise at least this fraction above its surroundings to be counted. Higher = only dominant modes kept. Lower = weak bumps may qualify.">?</span>
+            <span class="val-badge" id="prom-val">0.10</span>
+          </label>
+          <input type="range" id="prom" min="0.01" max="0.5" step="0.01" value="0.10">
+          <p class="hint">Higher &rarr; only strong peaks count &nbsp;&middot;&nbsp; Lower &rarr; weak modes included</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Threshold -->
+    <div>
+      <h2>Threshold</h2>
+      <div class="threshold-auto">
+        <input type="checkbox" id="manual-chk">
+        <label for="manual-chk">Override automatic threshold</label>
+      </div>
+      <div class="control" style="margin-top:6px">
+        <label>
+          Split at grey level
+          <span class="hint-icon" data-tip="Pixels below this value go to one class, above to the other. When auto is on, the valley or Otsu method picks this for you.">?</span>
+          <span class="val-badge" id="manual-val">128</span>
+        </label>
+        <input type="range" id="manual-thr" min="0" max="255" step="1" value="128" disabled>
+        <p class="hint">Drag to manually set the foreground / background split point</p>
+      </div>
+    </div>
+
+    <!-- Segmentation -->
+    <div>
+      <h2>Segmentation</h2>
+      <p class="hint" style="margin-bottom:6px">Which pixel class is the foreground?</p>
+      <div class="radio-row">
+        <label><input type="radio" name="polarity" value="auto" checked> Auto</label>
+        <label><input type="radio" name="polarity" value="dark"> Dark</label>
+        <label><input type="radio" name="polarity" value="bright"> Bright</label>
+      </div>
+      <p class="hint" style="margin-top:4px">Auto picks the smaller class. Use Dark for text on paper, Bright for objects on dark backgrounds.</p>
+      <div class="toggle-row" style="margin-top:10px">
+        <input type="checkbox" id="cleanup-chk" checked>
+        <label for="cleanup-chk">Morphological cleanup</label>
+        <span class="hint-icon" data-tip="Removes tiny isolated blobs and fills small holes using morphological opening + closing. Uncheck to see the raw threshold mask.">?</span>
+      </div>
+    </div>
+
+    <!-- Sharpening -->
+    <div>
+      <h2>Sharpening</h2>
+      <div class="control-group">
+        <div class="control">
+          <label>Method</label>
+          <select id="sharpen-method" class="full">
+            <option value="mask_aware" selected>Mask-aware unsharp</option>
+            <option value="unsharp">Unsharp mask</option>
+            <option value="laplacian">Laplacian</option>
+          </select>
+          <div id="method-desc" class="method-desc"></div>
+        </div>
+        <div class="control">
+          <label>
+            Blur radius
+            <span class="hint-icon" data-tip="Size of the Gaussian blur used to extract the detail layer. Larger = coarser, broader sharpening. Smaller = fine edge crispening only.">?</span>
+            <span class="val-badge" id="radius-val">1.5</span>
+          </label>
+          <input type="range" id="radius" min="0.5" max="10" step="0.5" value="1.5">
+          <p class="hint">Larger &rarr; broad halo effect &nbsp;&middot;&nbsp; Smaller &rarr; crisp edges only</p>
+        </div>
+        <div id="amount-rows" class="control hidden">
+          <label>
+            Strength
+            <span class="hint-icon" data-tip="How much of the detail layer to add back. 0 = no change. 1 = standard sharpening. 2+ = heavy, may amplify noise.">?</span>
+            <span class="val-badge" id="amount-val">1.0</span>
+          </label>
+          <input type="range" id="amount" min="0" max="5" step="0.1" value="1.0">
+          <p class="hint">0 = no change &nbsp;&middot;&nbsp; 1 = normal &nbsp;&middot;&nbsp; 2+ = aggressive</p>
+        </div>
+        <div id="amount-fg-rows">
+          <div class="control">
+            <label>
+              Foreground strength
+              <span class="hint-icon" data-tip="Sharpening strength applied inside the segmented foreground mask. Higher = objects appear crisper.">?</span>
+              <span class="val-badge" id="amount-fg-val">1.5</span>
+            </label>
+            <input type="range" id="amount-fg" min="0" max="5" step="0.1" value="1.5">
+          </div>
+          <div class="control" style="margin-top:8px">
+            <label>
+              Background strength
+              <span class="hint-icon" data-tip="Sharpening strength applied outside the mask. Keep low to avoid amplifying background noise.">?</span>
+              <span class="val-badge" id="amount-bg-val">0.3</span>
+            </label>
+            <input type="range" id="amount-bg" min="0" max="5" step="0.1" value="0.3">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="action-buttons">
+      <button id="btn-analyse">Analyse</button>
+      <button id="btn-reset" class="btn-reset">Reset</button>
+    </div>
+
+  </aside>
+
+  <!-- Main area -->
+  <main class="main">
+
+    <!-- Placeholder -->
+    <div id="placeholder" style="text-align:center;padding:80px 20px;color:var(--muted)">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin:0 auto 16px;display:block">
+        <rect width="64" height="64" rx="12" fill="currentColor" fill-opacity=".08"/>
+        <path d="M16 48 Q22 28 28 34 Q34 40 40 24 Q44 14 48 16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <circle cx="28" cy="34" r="3" fill="currentColor" fill-opacity=".4"/>
+        <circle cx="40" cy="24" r="3" fill="currentColor" fill-opacity=".4"/>
+      </svg>
+      <p style="font-size:16px;font-weight:600">Select a tutorial image to begin</p>
+      <p style="font-size:13px;margin-top:8px">Each processing stage appears as an interactive step card below.</p>
+    </div>
+
+    <!-- Result cards -->
+    <div id="cards-area"></div>
+
+    <!-- Warnings -->
+    <div id="warnings-panel" class="warnings-panel hidden"></div>
+
+    <!-- Downloads -->
+    <div id="dl-row" class="dl-row hidden">
+      <button class="dl-btn" id="btn-dl-json">Download JSON metrics</button>
+      <button class="dl-btn" id="btn-dl-zip">Download images (ZIP)</button>
+    </div>
+
+  </main>
+
+</div><!-- .layout -->
+
+<!-- Tooltip -->
+<div id="tooltip" class="tooltip-bubble hidden"></div>
+
+<!-- Spinner overlay -->
+<div id="spinner">
+  <div class="spin-box">
+    <div class="spinner-ring"></div>
+    <p>Analysing&hellip;</p>
+  </div>
+</div>
+
+<script>
+  try {
+    const annotPlugin = window['chartjs-plugin-annotation'];
+    if (annotPlugin) Chart.register(annotPlugin);
+  } catch(e) { /* annotation not critical */ }
+</script>
+<script src="app.js"></script>
+</body>
+</html>
